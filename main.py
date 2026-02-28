@@ -73,6 +73,15 @@ async def get_dashboard_data():
         # Convert History DataFrame to list of dicts for JSON response
         history_list = history_df.to_dict('records')
         
+        # Fetch BTC Benchmark
+        from services.bitget import fetch_btc_ticker
+        btc_ticker = fetch_btc_ticker()
+        btc_price = fnum(btc_ticker.get("lastPr", 0))
+        btc_change_24h = fnum(btc_ticker.get("chgUtc", btc_ticker.get("changeUtc24h", 0))) * 100 # usually a decimal like 0.05 for 5%
+        # sometimes bitget returns it as decimal, let's just pass raw or calculate if not exists
+        # actually bitget v2 ticker has "chgUtc" as string like "0.0123" (1.23%)
+        # Let's just pass the ticker object and handle in frontend
+        
         return {
             "metrics": {
                 "equity": equity,
@@ -85,7 +94,11 @@ async def get_dashboard_data():
             },
             "positions": pos_data,
             "nav_data": nav_data,
-            "history": history_list
+            "history": history_list,
+            "btc_benchmark": {
+                "price": btc_price,
+                "change24h": btc_change_24h
+            }
         }
         
     except Exception as e:

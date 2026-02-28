@@ -96,3 +96,15 @@ def fetch_kline_futures(symbol: str = "BTCUSDT", granularity: str = "1h", produc
         return df.sort_values("timestamp")
     except Exception:
         return pd.DataFrame()
+
+def fetch_btc_ticker() -> Dict:
+    """Fetch BTCUSDT ticker for benchmark comparison."""
+    try:
+        path = "/api/v2/mix/market/ticker"
+        params = {"symbol": "BTCUSDT", "productType": "USDT-FUTURES"}
+        res = requests.get(f"{BASE_URL}{path}", params=params, timeout=5).json()
+        if res.get("code") == "00000" and res.get("data"):
+            return res["data"][0]
+    except Exception:
+        pass
+    return {}
