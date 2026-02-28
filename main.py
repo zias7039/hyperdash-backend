@@ -83,6 +83,16 @@ async def get_dashboard_data():
         # Convert History DataFrame to list of dicts for JSON response
         history_list = history_df.to_dict('records')
         
+        # Calculate daily PnL
+        prev_equity = None
+        for item in history_list:
+            eq = fnum(item['equity'])
+            if prev_equity is not None:
+                item['daily_pnl'] = eq - prev_equity
+            else:
+                item['daily_pnl'] = 0
+            prev_equity = eq
+        
         # Fetch BTC Benchmark Current
         from services.bitget import fetch_btc_ticker, fetch_kline_futures
         btc_ticker = fetch_btc_ticker()
