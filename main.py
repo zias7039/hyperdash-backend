@@ -64,6 +64,16 @@ async def get_dashboard_data():
         if equity > 0:
             leverage = sum(fnum(p.get("marginSize", 0)) * fnum(p.get("leverage", 0)) for p in pos_data) / equity
             
+        # Margin Distribution Calc
+        margin_dist = {}
+        for p in pos_data:
+            sym = p.get("symbol", "").replace("USDT", "")
+            if sym and fnum(p.get("marginSize", 0)) > 0:
+                margin_dist[sym] = margin_dist.get(sym, 0) + fnum(p.get("marginSize", 0))
+        
+        margin_distribution = [{"name": k, "value": v} for k, v in margin_dist.items()]
+        margin_distribution.sort(key=lambda x: x["value"], reverse=True)
+            
         # Try to record snapshot
         history_df, _ = try_record_snapshot(equity)
         
@@ -134,6 +144,7 @@ async def get_dashboard_data():
             "positions": pos_data,
             "nav_data": nav_data,
             "history": history_list,
+            "margin_distribution": margin_distribution,
             "btc_benchmark": {
                 "price": btc_price,
                 "change24h": btc_change_24h
