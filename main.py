@@ -83,8 +83,8 @@ async def get_dashboard_data():
         btc_history = []
         if not history_df.empty:
             try:
-                # Fetch recent daily candles (adjust limit if history is longer than 100 days)
-                btc_df = fetch_kline_futures(symbol="BTCUSDT", granularity="1D", limit=100)
+                # Fetch recent daily candles (adjust limit to 1000 to cover old CSV dates)
+                btc_df = fetch_kline_futures(symbol="BTCUSDT", granularity="1D", limit=1000)
                 if not btc_df.empty:
                     # Format BTC timestamp to YYYY-MM-DD
                     btc_df['date'] = btc_df['timestamp'].dt.strftime('%Y-%m-%d')
