@@ -73,14 +73,47 @@ async def get_dashboard_data():
         # Convert History DataFrame to list of dicts for JSON response
         history_list = history_df.to_dict('records')
         
-        # Fetch BTC Benchmark
-        from services.bitget import fetch_btc_ticker
+        # Fetch BTC Benchmark Current
+        from services.bitget import fetch_btc_ticker, fetch_kline_futures
         btc_ticker = fetch_btc_ticker()
         btc_price = fnum(btc_ticker.get("lastPr", 0))
-        btc_change_24h = fnum(btc_ticker.get("chgUtc", btc_ticker.get("changeUtc24h", 0))) * 100 # usually a decimal like 0.05 for 5%
-        # sometimes bitget returns it as decimal, let's just pass raw or calculate if not exists
-        # actually bitget v2 ticker has "chgUtc" as string like "0.0123" (1.23%)
-        # Let's just pass the ticker object and handle in frontend
+        btc_change_24h = fnum(btc_ticker.get("chgUtc", btc_ticker.get("changeUtc24h", 0))) * 100
+        
+        # [NEW] Fetch BTC Historical Data (1D candles) to match with history_df dates
+        btc_history = []
+        if not history_df.empty:
+            try:
+                # Fetch recent daily candles (adjust limit if history is longer than 100 days)
+                btc_df = fetch_kline_futures(symbol="BTCUSDT", granularity="1D", limit=100)
+                if not btc_df.empty:
+                    # Format BTC timestamp to YYYY-MM-DD
+                    btc_df['date'] = btc_df['timestamp'].dt.strftime('%Y-%m-%d')
+                    # Create a dictionary for fast lookup: { 'YYYY-MM-DD': close_price }
+                    btc_price_map = dict(zip(btc_df['date'], btc_df['close']))
+                    
+                    # Align BTC price to user's equity history
+                    first_btc_price = None
+                    first_equity = fnum(history_list[0]['equity']) if history_list else 0
+                    
+                    for item in history_list:
+                        date_str = item['date']
+                        b_price = btc_price_map.get(date_str)
+                        if b_price:
+                            if first_btc_price is None:
+                                first_btc_price = b_price
+                                
+                            item['btc_price'] = b_price
+                            # Calculate normalized BTC NAV (same starting point as equity)
+                            if first_equity > 0:
+                                item['btc_nav'] = first_equity * (b_price / first_btc_price)
+                            else:
+                                item['btc_nav'] = b_price # fallback
+                        else:
+                            # If no exact date match, carry forward previous or set None
+                            item['btc_price'] = None
+                            item['btc_nav'] = None
+            except Exception as e:
+                print(f"Error fetching historical BTC: {e}")
         
         return {
             "metrics": {
