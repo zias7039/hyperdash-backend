@@ -1,8 +1,7 @@
 # services/upbit.py
 import requests
-import streamlit as st
 
-@st.cache_data(ttl=60)
+# We can cache this in memory or simply fetch it every time. Let's not use streamlit's cache since we're using FastAPI.
 def fetch_usdt_krw() -> float | None:
     try:
         # 업비트 KRW-USDT 마켓 직접 조회
