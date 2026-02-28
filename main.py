@@ -173,6 +173,15 @@ async def force_snapshot():
         equity = fnum(acct_data.get("usdtEquity")) if acct_data else available
         
         _, recorded = try_record_snapshot(equity, force=True)
+        
+        if recorded:
+            from services.telegram import send_telegram_message
+            import datetime
+            date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+            msg = f"📊 <b>Hyperdash Daily Report</b> ({date_str})\n\n"
+            msg += f"💰 <b>Total Equity:</b> ${equity:,.2f}"
+            send_telegram_message(msg)
+
         return {"success": True, "recorded": recorded, "equity": equity}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error forcing snapshot: {str(e)}")
