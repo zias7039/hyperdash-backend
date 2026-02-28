@@ -83,13 +83,19 @@ async def get_dashboard_data():
         btc_history = []
         if not history_df.empty:
             try:
-                # Fetch recent daily candles (adjust limit to 1000 to cover old CSV dates)
-                btc_df = fetch_kline_futures(symbol="BTCUSDT", granularity="1D", limit=1000)
-                if not btc_df.empty:
-                    # Format BTC timestamp to YYYY-MM-DD
-                    btc_df['date'] = btc_df['timestamp'].dt.strftime('%Y-%m-%d')
+                # Fetch recent daily candles (Binance API allows 1000 per request easily)
+                import requests
+                binance_res = requests.get("https://api.binance.com/api/v3/klines", params={
+                    "symbol": "BTCUSDT", "interval": "1d", "limit": 1000
+                }, timeout=5).json()
+                
+                if binance_res and len(binance_res) > 0:
+                    import datetime
                     # Create a dictionary for fast lookup: { 'YYYY-MM-DD': close_price }
-                    btc_price_map = dict(zip(btc_df['date'], btc_df['close']))
+                    btc_price_map = {}
+                    for candle in binance_res:
+                        d_str = datetime.datetime.fromtimestamp(candle[0]/1000).strftime('%Y-%m-%d')
+                        btc_price_map[d_str] = float(candle[4]) # index 4 is close price
                     
                     # Align BTC price to user's equity history
                     first_btc_price = None
