@@ -186,5 +186,39 @@ async def force_snapshot():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error forcing snapshot: {str(e)}")
 
+# --- User Inputs & Settings APIs ---
+
+from utils.settings import load_settings, save_settings
+from services.history import insert_manual_history
+
+class SettingsUpdate(BaseModel):
+    total_invested: float
+
+@app.get("/api/settings")
+async def get_settings():
+    return load_settings()
+
+@app.post("/api/settings")
+async def update_settings(data: SettingsUpdate):
+    try:
+        settings = load_settings()
+        settings["total_invested"] = data.total_invested
+        save_settings(settings)
+        return {"success": True, "total_invested": data.total_invested}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class HistoryUpdate(BaseModel):
+    date: str
+    equity: float
+
+@app.post("/api/history")
+async def update_history(data: HistoryUpdate):
+    try:
+        success = insert_manual_history(data.date, data.equity)
+        return {"success": success, "date": data.date, "equity": data.equity}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -44,3 +44,23 @@ def try_record_snapshot(current_equity, force=False):
         return df, True # 저장됨
         
     return df, False
+
+def insert_manual_history(date_str: str, equity_value: float):
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+        
+    df = load_history()
+    
+    # Remove existing record if it exists
+    if date_str in df["date"].values:
+        df = df[df["date"] != date_str]
+        
+    # Append new record
+    new_row = pd.DataFrame([{"date": date_str, "equity": equity_value}])
+    df = pd.concat([df, new_row], ignore_index=True)
+    
+    # Sort by date so chart stays correct
+    df = df.sort_values(by="date", ascending=True)
+    
+    df.to_csv(FILE_PATH, index=False)
+    return True
