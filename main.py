@@ -208,6 +208,8 @@ async def update_settings(data: SettingsUpdate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+from typing import List
+
 class HistoryUpdate(BaseModel):
     date: str
     equity: float
@@ -217,6 +219,16 @@ async def update_history(data: HistoryUpdate):
     try:
         success = insert_manual_history(data.date, data.equity)
         return {"success": success, "date": data.date, "equity": data.equity}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/history/bulk")
+async def update_history_bulk(data: List[HistoryUpdate]):
+    try:
+        from services.history import update_bulk_history
+        data_list = [{"date": item.date, "equity": item.equity} for item in data]
+        success = update_bulk_history(data_list)
+        return {"success": success, "count": len(data_list)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

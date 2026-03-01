@@ -64,3 +64,15 @@ def insert_manual_history(date_str: str, equity_value: float):
     
     df.to_csv(FILE_PATH, index=False)
     return True
+
+def update_bulk_history(data_list: list):
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+        
+    df = pd.DataFrame(data_list)
+    
+    # Sort by date so chart stays correct
+    df = df.sort_values(by="date", ascending=True)
+    
+    df.to_csv(FILE_PATH, index=False)
+    return True
