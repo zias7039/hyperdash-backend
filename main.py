@@ -114,7 +114,7 @@ async def get_dashboard_data():
                     # Create a dictionary for fast lookup: { 'YYYY-MM-DD': close_price }
                     btc_price_map = {}
                     for candle in binance_res:
-                        d_str = datetime.datetime.fromtimestamp(candle[0]/1000).strftime('%Y-%m-%d')
+                        d_str = datetime.datetime.fromtimestamp(int(candle[0])/1000).strftime('%Y-%m-%d')
                         btc_price_map[d_str] = float(candle[4]) # index 4 is close price
                     
                     # Align BTC price to user's equity history
