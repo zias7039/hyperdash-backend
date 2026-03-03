@@ -141,6 +141,41 @@ async def get_dashboard_data():
             except Exception as e:
                 print(f"Error fetching historical BTC: {e}")
         
+        # ===== Deposit-Aware Return Rate Calculation =====
+        import json
+        deposits_path = os.path.join(os.path.dirname(__file__), "data", "deposits.json")
+        deposits = []
+        if os.path.exists(deposits_path):
+            try:
+                with open(deposits_path, "r") as f:
+                    deposits = json.load(f)
+            except Exception as e:
+                print(f"Error loading deposits: {e}")
+        
+        if deposits and history_list:
+            # Build a map of date -> net cash flow (positive = deposit, negative = withdrawal)
+            cashflow_map = {}
+            for dep in deposits:
+                d = dep["date"]
+                amt = dep["amount"]
+                if dep["type"] == "withdrawal":
+                    amt = -amt
+                cashflow_map[d] = cashflow_map.get(d, 0) + amt
+            
+            # Calculate cumulative invested capital and return % at each date
+            cumulative_invested = 0
+            for item in history_list:
+                date_str = item["date"]
+                if date_str in cashflow_map:
+                    cumulative_invested += cashflow_map[date_str]
+                
+                item["invested_capital"] = round(cumulative_invested, 2)
+                eq = fnum(item["equity"])
+                if cumulative_invested > 0:
+                    item["return_pct"] = round(((eq - cumulative_invested) / cumulative_invested) * 100, 2)
+                else:
+                    item["return_pct"] = 0
+        
         return {
             "metrics": {
                 "equity": equity,

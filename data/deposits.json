@@ -1,0 +1,37 @@
+[
+    {
+        "date": "2024-10-31",
+        "type": "deposit",
+        "amount": 333
+    },
+    {
+        "date": "2024-11-30",
+        "type": "deposit",
+        "amount": 533
+    },
+    {
+        "date": "2024-12-03",
+        "type": "withdrawal",
+        "amount": 535
+    },
+    {
+        "date": "2025-12-07",
+        "type": "deposit",
+        "amount": 466
+    },
+    {
+        "date": "2026-01-01",
+        "type": "deposit",
+        "amount": 479
+    },
+    {
+        "date": "2026-02-01",
+        "type": "deposit",
+        "amount": 408
+    },
+    {
+        "date": "2026-02-28",
+        "type": "deposit",
+        "amount": 341
+    }
+]
