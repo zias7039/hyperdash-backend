@@ -178,6 +178,17 @@ async def get_dashboard_data():
                     item["return_pct"] = round(((eq - cumulative_invested) / cumulative_invested) * 100, 2)
                 else:
                     item["return_pct"] = 0
+            
+            # Also compute BTC return % over same period
+            first_btc = None
+            for item in history_list:
+                bp = item.get("btc_price")
+                if bp and bp > 0:
+                    if first_btc is None:
+                        first_btc = bp
+                    item["btc_return_pct"] = round(((bp - first_btc) / first_btc) * 100, 2)
+                else:
+                    item["btc_return_pct"] = None
         
         return {
             "metrics": {
