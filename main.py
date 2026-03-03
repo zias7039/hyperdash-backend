@@ -153,21 +153,24 @@ async def get_dashboard_data():
                 print(f"Error loading deposits: {e}")
         
         if deposits and history_list:
-            # Build a map of date -> net cash flow (positive = deposit, negative = withdrawal)
-            cashflow_map = {}
-            for dep in deposits:
-                d = dep["date"]
-                amt = dep["amount"]
-                if dep["type"] == "withdrawal":
-                    amt = -amt
-                cashflow_map[d] = cashflow_map.get(d, 0) + amt
+            # Sort deposits by date for chronological processing
+            sorted_deposits = sorted(deposits, key=lambda x: x["date"])
             
-            # Calculate cumulative invested capital and return % at each date
+            # Calculate cumulative invested capital at each history date
             cumulative_invested = 0
+            dep_idx = 0
+            
             for item in history_list:
                 date_str = item["date"]
-                if date_str in cashflow_map:
-                    cumulative_invested += cashflow_map[date_str]
+                
+                # Apply all deposits that happened on or before this history date
+                while dep_idx < len(sorted_deposits) and sorted_deposits[dep_idx]["date"] <= date_str:
+                    dep = sorted_deposits[dep_idx]
+                    amt = dep["amount"]
+                    if dep["type"] == "withdrawal":
+                        amt = -amt
+                    cumulative_invested += amt
+                    dep_idx += 1
                 
                 item["invested_capital"] = round(cumulative_invested, 2)
                 eq = fnum(item["equity"])
