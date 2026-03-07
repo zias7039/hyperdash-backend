@@ -31,8 +31,8 @@ def init_db():
         return
         
     try:
-        # Create engine
-        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        # Create engine with sslmode require for Supabase
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args={'sslmode': 'require'})
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         
         # Create tables if not exist
