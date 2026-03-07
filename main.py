@@ -107,12 +107,38 @@ async def get_dashboard_data():
         async def fetch_btc():
             return await asyncio.to_thread(fetch_btc_ticker)
             
-        async def fetch_binance_klines():
-            return await asyncio.to_thread(
-                lambda: requests.get("https://api.binance.com/api/v3/klines", params={
-                    "symbol": "BTCUSDT", "interval": "1d", "limit": 1000
-                }, timeout=5).json()
-            )
+        async def fetch_btc_klines():
+            """Fetch BTC daily prices - try CoinGecko first (works globally), fallback to Binance"""
+            import datetime
+            def _fetch():
+                # Try CoinGecko first (no geo-restrictions)
+                try:
+                    cg_url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
+                    cg_params = {"vs_currency": "usd", "days": "365", "interval": "daily"}
+                    cg_res = requests.get(cg_url, params=cg_params, timeout=10)
+                    if cg_res.status_code == 200:
+                        cg_data = cg_res.json()
+                        prices = cg_data.get("prices", [])
+                        # Convert to Binance-like format for compatibility
+                        result = []
+                        for p in prices:
+                            ts = p[0]  # timestamp in ms
+                            price = p[1]
+                            result.append([ts, 0, 0, 0, price])  # [timestamp, open, high, low, close]
+                        return result
+                except Exception as e:
+                    print(f"CoinGecko failed: {e}")
+                
+                # Fallback to Binance
+                try:
+                    res = requests.get("https://api.binance.com/api/v3/klines", params={
+                        "symbol": "BTCUSDT", "interval": "1d", "limit": 1000
+                    }, timeout=5)
+                    return res.json()
+                except Exception as e:
+                    print(f"Binance also failed: {e}")
+                    return []
+            return await asyncio.to_thread(_fetch)
 
         # Run all external requests concurrently
         pos_result, acct_result, usdt_rate, btc_ticker, binance_res = await asyncio.gather(
@@ -120,7 +146,7 @@ async def get_dashboard_data():
             fetch_acc(),
             fetch_rate(),
             fetch_btc(),
-            fetch_binance_klines(),
+            fetch_btc_klines(),
             return_exceptions=True
         )
         
