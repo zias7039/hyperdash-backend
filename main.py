@@ -214,15 +214,8 @@ async def get_dashboard_data():
                         item['btc_nav'] = None
         
         # ===== Deposit-Aware Return Rate Calculation =====
-        import json
-        deposits_path = os.path.join(os.path.dirname(__file__), "data", "deposits.json")
-        deposits = []
-        if os.path.exists(deposits_path):
-            try:
-                with open(deposits_path, "r") as f:
-                    deposits = json.load(f)
-            except Exception as e:
-                print(f"Error loading deposits: {e}")
+        from services.deposits import load_deposits
+        deposits = load_deposits()
         
         if deposits and history_list:
             # Sort deposits by date for chronological processing
@@ -349,6 +342,26 @@ async def update_history_bulk(data: List[HistoryUpdate]):
         from services.history import update_bulk_history
         data_list = [{"date": item.date, "equity": item.equity} for item in data]
         success = update_bulk_history(data_list)
+        return {"success": success, "count": len(data_list)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class DepositUpdate(BaseModel):
+    date: str
+    type: str # 'deposit' or 'withdrawal'
+    amount: float
+
+@app.get("/api/deposits")
+async def get_deposits_api():
+    from services.deposits import load_deposits
+    return load_deposits()
+
+@app.post("/api/deposits")
+async def update_deposits_bulk(data: List[DepositUpdate]):
+    try:
+        from services.deposits import update_bulk_deposits
+        data_list = [{"date": item.date, "type": item.type, "amount": item.amount} for item in data]
+        success = update_bulk_deposits(data_list)
         return {"success": success, "count": len(data_list)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

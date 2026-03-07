@@ -24,6 +24,13 @@ class EquityHistory(Base):
     date = Column(String, primary_key=True, index=True)
     equity = Column(Float, nullable=False)
 
+class DepositHistory(Base):
+    __tablename__ = "deposit_history"
+    id = Column(String, primary_key=True, index=True) # Custom ID like date_type_amount to handle multiple per day, or just auto-increment.
+    date = Column(String, nullable=False, index=True)
+    type = Column(String, nullable=False) # 'deposit' or 'withdrawal'
+    amount = Column(Float, nullable=False)
+
 def init_db():
     global engine, SessionLocal
     if not DATABASE_URL:
