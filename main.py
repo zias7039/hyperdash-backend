@@ -12,6 +12,8 @@ from services.history import try_record_snapshot, load_history
 from services.fund import get_nav_metrics
 from utils.format import fnum
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 # Load environment variables
 load_dotenv()
 
@@ -39,6 +41,46 @@ def get_bitget_credentials():
         raise HTTPException(status_code=500, detail="Bitget credentials not configured in environment.")
         
     return api_key, api_secret, passphrase
+
+# --- APScheduler Background Task ---
+scheduler = AsyncIOScheduler()
+
+async def auto_record_snapshot_task():
+    try:
+        api_key, api_secret, passphrase = get_bitget_credentials()
+        # Run synchronous network calls in a thread if blocking, or just direct if simple
+        import asyncio
+        acct_data, _ = await asyncio.to_thread(fetch_account, api_key, api_secret, passphrase, PRODUCT_TYPE, MARGIN_COIN)
+        available = fnum(acct_data.get("available")) if acct_data else 0.0
+        equity = fnum(acct_data.get("usdtEquity")) if acct_data else available
+        
+        _, recorded = await asyncio.to_thread(try_record_snapshot, equity, True) # force=True
+        
+        if recorded:
+            try:
+                from services.telegram import send_telegram_message
+                import datetime
+                date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+                msg = f"⏱️ <b>Hyperdash Auto Daily Snapshot</b> ({date_str})\n\n"
+                msg += f"💰 <b>Total Equity:</b> ${equity:,.2f}"
+                send_telegram_message(msg)
+            except Exception:
+                pass
+            print(f"Auto snapshot recorded successfully at {equity}")
+            
+    except Exception as e:
+        print(f"Error in auto snapshot task: {e}")
+
+@app.on_event("startup")
+def start_scheduler():
+    # Schedule to run every day at 09:00 AM KST
+    scheduler.add_job(auto_record_snapshot_task, 'cron', hour=9, minute=0, timezone='Asia/Seoul')
+    scheduler.start()
+    print("APScheduler started. Snapshot scheduled for 09:00 AM KST.")
+
+@app.on_event("shutdown")
+def stop_scheduler():
+    scheduler.shutdown()
 
 @app.get("/api/dashboard")
 async def get_dashboard_data():
