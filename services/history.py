@@ -1,15 +1,16 @@
 import pandas as pd
 from datetime import datetime, timedelta, timezone
-from services.db import engine, SessionLocal, EquityHistory
+from services import db as db_module
+from services.db import EquityHistory
 
 def get_kst_now():
     return datetime.now(timezone(timedelta(hours=9)))
 
 def load_history():
-    if not engine:
+    if not db_module.engine:
         return pd.DataFrame(columns=["date", "equity"])
     try:
-        df = pd.read_sql("SELECT * FROM equity_history ORDER BY date ASC", con=engine)
+        df = pd.read_sql("SELECT * FROM equity_history ORDER BY date ASC", con=db_module.engine)
         return df
     except Exception:
         return pd.DataFrame(columns=["date", "equity"])
@@ -23,9 +24,9 @@ def try_record_snapshot(current_equity, force=False):
     is_exist = today_str in df["date"].values
 
     if (not is_exist and now_kst.hour >= 9) or force:
-        if not SessionLocal:
+        if not db_module.SessionLocal:
             return df, False
-        db = SessionLocal()
+        db = db_module.SessionLocal()
         try:
             record = db.query(EquityHistory).filter(EquityHistory.date == today_str).first()
             if record:
@@ -44,9 +45,9 @@ def try_record_snapshot(current_equity, force=False):
     return df, False
 
 def insert_manual_history(date_str: str, equity_value: float):
-    if not SessionLocal:
+    if not db_module.SessionLocal:
         return False
-    db = SessionLocal()
+    db = db_module.SessionLocal()
     try:
         record = db.query(EquityHistory).filter(EquityHistory.date == date_str).first()
         if record:
@@ -63,9 +64,9 @@ def insert_manual_history(date_str: str, equity_value: float):
         db.close()
 
 def update_bulk_history(data_list: list):
-    if not SessionLocal:
+    if not db_module.SessionLocal:
         return False
-    db = SessionLocal()
+    db = db_module.SessionLocal()
     try:
         for item in data_list:
             date_str = item["date"]

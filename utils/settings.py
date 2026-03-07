@@ -1,9 +1,10 @@
-from services.db import SessionLocal, Setting
+from services.db import Setting
+from services import db as db_module
 
 def load_settings():
-    if not SessionLocal:
+    if not db_module.SessionLocal:
         return {"total_invested": 0.0}
-    db = SessionLocal()
+    db = db_module.SessionLocal()
     try:
         record = db.query(Setting).filter(Setting.key == "total_invested").first()
         if record:
@@ -15,9 +16,9 @@ def load_settings():
         db.close()
 
 def save_settings(settings: dict):
-    if not SessionLocal:
+    if not db_module.SessionLocal:
         return
-    db = SessionLocal()
+    db = db_module.SessionLocal()
     try:
         val = settings.get("total_invested", 0.0)
         record = db.query(Setting).filter(Setting.key == "total_invested").first()
