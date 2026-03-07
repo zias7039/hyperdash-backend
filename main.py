@@ -244,14 +244,18 @@ async def get_dashboard_data():
                 else:
                     item["return_pct"] = 0
             
-            # Also compute BTC return % over same period
+            # Also compute BTC return % over same period (aligned with deposits)
             first_btc = None
             for item in history_list:
-                bp = item.get("btc_price")
-                if bp and bp > 0:
-                    if first_btc is None:
-                        first_btc = bp
-                    item["btc_return_pct"] = round(((bp - first_btc) / first_btc) * 100, 2)
+                # Start tracking BTC return only when we have invested capital
+                if item.get("invested_capital", 0) > 0:
+                    bp = item.get("btc_price")
+                    if bp and bp > 0:
+                        if first_btc is None:
+                            first_btc = bp
+                        item["btc_return_pct"] = round(((bp - first_btc) / first_btc) * 100, 2)
+                    else:
+                        item["btc_return_pct"] = None
                 else:
                     item["btc_return_pct"] = None
         
