@@ -135,13 +135,16 @@ async def get_dashboard_data():
         # [NEW] Fetch BTC Historical Data (1D candles) to match with history_df dates
         btc_history = []
         if not history_df.empty:
-            if binance_res and len(binance_res) > 0:
+            if binance_res and isinstance(binance_res, list) and len(binance_res) > 0:
                 import datetime
                 # Create a dictionary for fast lookup: { 'YYYY-MM-DD': close_price }
                 btc_price_map = {}
                 for candle in binance_res:
-                    d_str = datetime.datetime.fromtimestamp(int(candle[0])/1000).strftime('%Y-%m-%d')
-                    btc_price_map[d_str] = float(candle[4]) # index 4 is close price
+                    try:
+                        d_str = datetime.datetime.fromtimestamp(int(candle[0])/1000).strftime('%Y-%m-%d')
+                        btc_price_map[d_str] = float(candle[4]) # index 4 is close price
+                    except (ValueError, TypeError, IndexError):
+                        continue
                     
                 # Align BTC price to user's equity history
                 first_btc_price = None
