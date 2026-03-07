@@ -129,6 +129,8 @@ async def get_dashboard_data():
         acct_data = acct_result[0] if not isinstance(acct_result, Exception) else None
         usdt_rate = usdt_rate if not isinstance(usdt_rate, Exception) else None
         btc_ticker = btc_ticker if not isinstance(btc_ticker, Exception) else {}
+        
+        binance_err = str(binance_res) if isinstance(binance_res, Exception) else None
         binance_res = binance_res if not isinstance(binance_res, Exception) else []
 
         # Metrics Calc
@@ -194,24 +196,32 @@ async def get_dashboard_data():
                 # Align BTC price to user's equity history
                 first_btc_price = None
                 first_equity = fnum(history_list[0]['equity']) if history_list else 0
+                last_known_bp = None
                 
                 for item in history_list:
-                    date_str = item['date']
-                    b_price = btc_price_map.get(date_str)
+                    raw_date = item['date']
+                    # Handle both strings and datetime/Timestamp objects
+                    date_val = str(raw_date)[:10] if raw_date else ""
+                    
+                    b_price = btc_price_map.get(date_val)
                     if b_price:
                         if first_btc_price is None:
                             first_btc_price = b_price
                             
                         item['btc_price'] = b_price
+                        last_known_bp = b_price
                         # Calculate normalized BTC NAV (same starting point as equity)
                         if first_equity > 0:
                             item['btc_nav'] = first_equity * (b_price / first_btc_price)
                         else:
                             item['btc_nav'] = b_price # fallback
                     else:
-                        # If no exact date match, carry forward previous or set None
-                        item['btc_price'] = None
-                        item['btc_nav'] = None
+                        # If no exact date match, carry forward previous
+                        item['btc_price'] = last_known_bp
+                        if last_known_bp and first_btc_price:
+                            item['btc_nav'] = first_equity * (last_known_bp / first_btc_price)
+                        else:
+                            item['btc_nav'] = None
         
         # ===== Deposit-Aware Return Rate Calculation =====
         from services.deposits import load_deposits
@@ -226,7 +236,8 @@ async def get_dashboard_data():
             dep_idx = 0
             
             for item in history_list:
-                date_str = item["date"]
+                raw_date = item["date"]
+                date_str = str(raw_date)[:10] if raw_date else ""
                 
                 # Apply all deposits that happened on or before this history date
                 while dep_idx < len(sorted_deposits) and sorted_deposits[dep_idx]["date"] <= date_str:
@@ -275,7 +286,8 @@ async def get_dashboard_data():
             "margin_distribution": margin_distribution,
             "btc_benchmark": {
                 "price": btc_price,
-                "change24h": btc_change_24h
+                "change24h": btc_change_24h,
+                "binance_error": binance_err
             }
         }
         
