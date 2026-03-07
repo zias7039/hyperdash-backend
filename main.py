@@ -108,24 +108,34 @@ async def get_dashboard_data():
             return await asyncio.to_thread(fetch_btc_ticker)
             
         async def fetch_btc_klines():
-            """Fetch BTC daily prices - try CoinGecko first (works globally), fallback to Binance"""
-            import datetime
+            """Fetch BTC daily prices - Bitget first (guaranteed to work from Render), then fallbacks"""
             def _fetch():
-                # Try CoinGecko first (no geo-restrictions)
+                # Try Bitget spot klines first (same API provider, guaranteed to work)
+                try:
+                    bg_url = "https://api.bitget.com/api/v2/spot/market/candles"
+                    bg_params = {"symbol": "BTCUSDT", "granularity": "1day", "limit": "200"}
+                    bg_res = requests.get(bg_url, params=bg_params, timeout=10)
+                    if bg_res.status_code == 200:
+                        bg_data = bg_res.json()
+                        if bg_data.get("code") == "00000":
+                            candles = bg_data.get("data", [])
+                            # Bitget format: [timestamp, open, high, low, close, volume, ...]
+                            # Convert to unified format: [timestamp_ms, open, high, low, close]
+                            result = []
+                            for c in candles:
+                                result.append([int(c[0]), float(c[1]), float(c[2]), float(c[3]), float(c[4])])
+                            return result
+                except Exception as e:
+                    print(f"Bitget klines failed: {e}")
+                
+                # Fallback to CoinGecko
                 try:
                     cg_url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
                     cg_params = {"vs_currency": "usd", "days": "365", "interval": "daily"}
                     cg_res = requests.get(cg_url, params=cg_params, timeout=10)
                     if cg_res.status_code == 200:
-                        cg_data = cg_res.json()
-                        prices = cg_data.get("prices", [])
-                        # Convert to Binance-like format for compatibility
-                        result = []
-                        for p in prices:
-                            ts = p[0]  # timestamp in ms
-                            price = p[1]
-                            result.append([ts, 0, 0, 0, price])  # [timestamp, open, high, low, close]
-                        return result
+                        prices = cg_res.json().get("prices", [])
+                        return [[p[0], 0, 0, 0, p[1]] for p in prices]
                 except Exception as e:
                     print(f"CoinGecko failed: {e}")
                 
