@@ -45,11 +45,47 @@ async def get_dashboard_data():
     api_key, api_secret, passphrase = get_bitget_credentials()
     
     try:
-        # Fetch data
-        pos_data, _ = fetch_positions(api_key, api_secret, passphrase, PRODUCT_TYPE, MARGIN_COIN)
-        acct_data, _ = fetch_account(api_key, api_secret, passphrase, PRODUCT_TYPE, MARGIN_COIN)
-        usdt_rate = fetch_usdt_krw()
+        import asyncio
+        from services.bitget import fetch_btc_ticker
+        import requests
+
+        # Define async wrappers for our synchronous functions
+        async def fetch_pos():
+            return await asyncio.to_thread(fetch_positions, api_key, api_secret, passphrase, PRODUCT_TYPE, MARGIN_COIN)
         
+        async def fetch_acc():
+            return await asyncio.to_thread(fetch_account, api_key, api_secret, passphrase, PRODUCT_TYPE, MARGIN_COIN)
+        
+        async def fetch_rate():
+            return await asyncio.to_thread(fetch_usdt_krw)
+            
+        async def fetch_btc():
+            return await asyncio.to_thread(fetch_btc_ticker)
+            
+        async def fetch_binance_klines():
+            return await asyncio.to_thread(
+                lambda: requests.get("https://api.binance.com/api/v3/klines", params={
+                    "symbol": "BTCUSDT", "interval": "1d", "limit": 1000
+                }, timeout=5).json()
+            )
+
+        # Run all external requests concurrently
+        pos_result, acct_result, usdt_rate, btc_ticker, binance_res = await asyncio.gather(
+            fetch_pos(),
+            fetch_acc(),
+            fetch_rate(),
+            fetch_btc(),
+            fetch_binance_klines(),
+            return_exceptions=True
+        )
+        
+        # Unpack results handling potential exceptions
+        pos_data = pos_result[0] if not isinstance(pos_result, Exception) else []
+        acct_data = acct_result[0] if not isinstance(acct_result, Exception) else None
+        usdt_rate = usdt_rate if not isinstance(usdt_rate, Exception) else None
+        btc_ticker = btc_ticker if not isinstance(btc_ticker, Exception) else {}
+        binance_res = binance_res if not isinstance(binance_res, Exception) else []
+
         # Metrics Calc
         available = fnum(acct_data.get("available")) if acct_data else 0.0
         equity = fnum(acct_data.get("usdtEquity")) if acct_data else available
@@ -75,10 +111,10 @@ async def get_dashboard_data():
         margin_distribution.sort(key=lambda x: x["value"], reverse=True)
             
         # Try to record snapshot
-        history_df, _ = try_record_snapshot(equity)
+        history_df, _ = await asyncio.to_thread(try_record_snapshot, equity)
         
         # Get NAV Data
-        nav_data = get_nav_metrics(equity, history_df)
+        nav_data = await asyncio.to_thread(get_nav_metrics, equity, history_df)
         
         # Convert History DataFrame to list of dicts for JSON response
         history_list = history_df.to_dict('records')
@@ -93,53 +129,41 @@ async def get_dashboard_data():
                 item['daily_pnl'] = 0
             prev_equity = eq
         
-        # Fetch BTC Benchmark Current
-        from services.bitget import fetch_btc_ticker, fetch_kline_futures
-        btc_ticker = fetch_btc_ticker()
         btc_price = fnum(btc_ticker.get("lastPr", 0))
         btc_change_24h = fnum(btc_ticker.get("chgUtc", btc_ticker.get("changeUtc24h", 0))) * 100
         
         # [NEW] Fetch BTC Historical Data (1D candles) to match with history_df dates
         btc_history = []
         if not history_df.empty:
-            try:
-                # Fetch recent daily candles (Binance API allows 1000 per request easily)
-                import requests
-                binance_res = requests.get("https://api.binance.com/api/v3/klines", params={
-                    "symbol": "BTCUSDT", "interval": "1d", "limit": 1000
-                }, timeout=5).json()
+            if binance_res and len(binance_res) > 0:
+                import datetime
+                # Create a dictionary for fast lookup: { 'YYYY-MM-DD': close_price }
+                btc_price_map = {}
+                for candle in binance_res:
+                    d_str = datetime.datetime.fromtimestamp(int(candle[0])/1000).strftime('%Y-%m-%d')
+                    btc_price_map[d_str] = float(candle[4]) # index 4 is close price
+                    
+                # Align BTC price to user's equity history
+                first_btc_price = None
+                first_equity = fnum(history_list[0]['equity']) if history_list else 0
                 
-                if binance_res and len(binance_res) > 0:
-                    import datetime
-                    # Create a dictionary for fast lookup: { 'YYYY-MM-DD': close_price }
-                    btc_price_map = {}
-                    for candle in binance_res:
-                        d_str = datetime.datetime.fromtimestamp(int(candle[0])/1000).strftime('%Y-%m-%d')
-                        btc_price_map[d_str] = float(candle[4]) # index 4 is close price
-                    
-                    # Align BTC price to user's equity history
-                    first_btc_price = None
-                    first_equity = fnum(history_list[0]['equity']) if history_list else 0
-                    
-                    for item in history_list:
-                        date_str = item['date']
-                        b_price = btc_price_map.get(date_str)
-                        if b_price:
-                            if first_btc_price is None:
-                                first_btc_price = b_price
-                                
-                            item['btc_price'] = b_price
-                            # Calculate normalized BTC NAV (same starting point as equity)
-                            if first_equity > 0:
-                                item['btc_nav'] = first_equity * (b_price / first_btc_price)
-                            else:
-                                item['btc_nav'] = b_price # fallback
+                for item in history_list:
+                    date_str = item['date']
+                    b_price = btc_price_map.get(date_str)
+                    if b_price:
+                        if first_btc_price is None:
+                            first_btc_price = b_price
+                            
+                        item['btc_price'] = b_price
+                        # Calculate normalized BTC NAV (same starting point as equity)
+                        if first_equity > 0:
+                            item['btc_nav'] = first_equity * (b_price / first_btc_price)
                         else:
-                            # If no exact date match, carry forward previous or set None
-                            item['btc_price'] = None
-                            item['btc_nav'] = None
-            except Exception as e:
-                print(f"Error fetching historical BTC: {e}")
+                            item['btc_nav'] = b_price # fallback
+                    else:
+                        # If no exact date match, carry forward previous or set None
+                        item['btc_price'] = None
+                        item['btc_nav'] = None
         
         # ===== Deposit-Aware Return Rate Calculation =====
         import json
