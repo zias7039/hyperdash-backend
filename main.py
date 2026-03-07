@@ -73,6 +73,9 @@ async def auto_record_snapshot_task():
 
 @app.on_event("startup")
 def start_scheduler():
+    from services.db import init_db
+    init_db()
+    
     # Schedule to run every day at 09:00 AM KST
     scheduler.add_job(auto_record_snapshot_task, 'cron', hour=9, minute=0, timezone='Asia/Seoul')
     scheduler.start()

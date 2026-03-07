@@ -1,0 +1,3 @@
+Failed URI 0: (psycopg2.OperationalError) could not translate host name "db.usejaxigevnbeemcenfu.supabase.co" to address: Name or service not known
+Failed URI 1: (psycopg2.OperationalError) could not translate host name "db.usejaxigevnbeemcenfu.supabase.co" to address: Name or service not known
+Failed URI 2: (psycopg2.OperationalError) connection to server at "aws-0-ap-northeast-2.pooler.supabase.com" (15.165.245.138), port 6543 failed: FATAL:  Tenant or user not found
